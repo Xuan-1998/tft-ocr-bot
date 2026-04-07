@@ -11,15 +11,26 @@ from game import find_league_window
 from difflib import SequenceMatcher
 from pynput import keyboard
 
-# --- F12 kill switch ---
+# --- Cmd+= kill switch (works globally, even when game is focused) ---
 BOT_RUNNING = True
+_pressed_keys = set()
 def on_press(key):
     global BOT_RUNNING
-    if key == keyboard.Key.f12:
-        BOT_RUNNING = False
-        print("\n🛑 F12 — stopping bot!\n")
-        return False
-kb_listener = keyboard.Listener(on_press=on_press)
+    _pressed_keys.add(key)
+    # Cmd+= (cmd is Key.cmd or Key.cmd_r, = is KeyCode '=')
+    if (keyboard.Key.cmd in _pressed_keys or keyboard.Key.cmd_r in _pressed_keys):
+        try:
+            if hasattr(key, 'char') and key.char == '=':
+                BOT_RUNNING = False
+                print("\n🛑 Cmd+= pressed — stopping bot!\n")
+                return False
+        except:
+            pass
+
+def on_release(key):
+    _pressed_keys.discard(key)
+
+kb_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
 kb_listener.daemon = True
 kb_listener.start()
 
@@ -44,7 +55,7 @@ def log(t, **d):
         f.write(json.dumps({"t": time.time(), "type": t, **d}) + "\n")
 
 print("=== MECHA FAST 8 BOT v4 ===")
-print("Press F12 to stop")
+print("Press Cmd+= to stop")
 print(f"Log: {LOG}\n")
 
 # --- State ---
@@ -152,24 +163,32 @@ def pickup_loot():
         time.sleep(0.6 if idx % 2 else 1.0)
 
 def handle_god_selection():
-    """At god rounds (2-4, 3-4, 4-4), click the left god blessing.
-    The god selection screen shows two options side by side."""
-    print("  ⚡ God selection — picking left blessing")
-    time.sleep(2)
-    # Left blessing is roughly at 35% of screen width, center height
-    left_x = int(width * 0.35)
+    """At god rounds, the screen shows two god blessings side by side.
+    Detect by checking if center screen is dark (overlay). Click left option."""
+    # Check if god screen is showing — center of screen will be dark overlay
+    center_img = ocr._grab((width//2 - 50, y_off + eff_h//3, width//2 + 50, y_off + eff_h//3 + 30))
+    import numpy as np
+    arr = np.array(center_img)
+    avg_brightness = arr.mean()
+    if avg_brightness > 100:
+        return False  # Not a dark overlay, no god screen
+
+    print("  ⚡ God selection screen detected — picking left blessing")
+    # Left blessing: ~30% from left, ~45% from top
+    left_x = int(width * 0.30)
     left_y = int(y_off + eff_h * 0.45)
     pyautogui.click(left_x, left_y)
+    time.sleep(1.5)
+    # Click again in case there's a confirm
+    pyautogui.click(left_x, left_y)
     time.sleep(1)
-    # After god selection, Pengu drops rewards — click center to collect
-    print("  🎁 Collecting Pengu rewards")
-    time.sleep(2)
-    center_x = width // 2
-    center_y = int(y_off + eff_h * 0.5)
-    pyautogui.click(center_x, center_y)
+    # Collect Pengu rewards — click center
+    print("  🎁 Collecting rewards")
+    pyautogui.click(width // 2, int(y_off + eff_h * 0.5))
     time.sleep(1)
-    pyautogui.click(center_x, center_y)
+    pyautogui.click(width // 2, int(y_off + eff_h * 0.5))
     time.sleep(0.5)
+    return True
 
 def place_items_on_carries():
     """Try to place items from item bench onto carry champions.
@@ -252,10 +271,9 @@ try:
             cycle += 1
             continue
 
-        # --- Handle special rounds ---
-        if current_round in GOD_ROUNDS and current_round not in god_rounds_handled:
-            handle_god_selection()
-            god_rounds_handled.add(current_round)
+        # --- Handle special screens (god selection, augments) ---
+        # Try god selection every cycle (detect by screen overlay)
+        if handle_god_selection():
             time.sleep(2)
             continue
 
