@@ -4,13 +4,27 @@ Phase 1 (1-1 to 3-7): Econ. Buy cheap frontline only. Save gold.
 Phase 2 (4-1): Level to 8. Roll down for AurelionSol/TahmKench/Karma.
 Phase 3 (4-1+): Fill board, place items, play for top 4.
 """
-import time, json, sys
+import time, json, sys, threading
 import pyautogui
 import comps, game_assets, arena_functions, mk_functions, screen_coords, ocr
 from vec4 import Vec4
 from vec2 import Vec2
 from game import find_league_window
 from difflib import SequenceMatcher
+from pynput import keyboard
+
+# --- Global kill switch: press F12 to stop ---
+BOT_RUNNING = True
+def on_press(key):
+    global BOT_RUNNING
+    if key == keyboard.Key.f12:
+        BOT_RUNNING = False
+        print("\n\n🛑 F12 pressed — stopping bot!\n")
+        return False  # stop listener
+
+kb_listener = keyboard.Listener(on_press=on_press)
+kb_listener.daemon = True
+kb_listener.start()
 
 # --- Setup ---
 w = find_league_window()
@@ -34,6 +48,7 @@ def log(t, **d):
 
 print(f"=== MECHA FAST 8 BOT ===")
 print(f"Strategy: Econ to 3-7, level 8 at 4-1, roll for ASol/Tahm/Karma")
+print(f"Press F12 at any time to stop the bot")
 print(f"Log: {LOG}\n")
 
 phase = "ECON"  # ECON -> ROLLDOWN -> LATEGAME
@@ -126,6 +141,11 @@ def pick_augment():
 try:
     cycle = 0
     while True:
+        # F12 kill switch
+        if not BOT_RUNNING:
+            print("Bot stopped via F12.")
+            break
+
         # Safety check
         if not mouse_in_game():
             print("  [PAUSED] Move mouse into game to resume...")
