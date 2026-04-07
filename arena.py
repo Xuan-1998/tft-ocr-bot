@@ -57,7 +57,7 @@ class Arena:
         sleep(0.5)
         self.fix_bench_state()
 
-    def have_champion(self) -> Champion | None:
+    def have_champion(self):
         """Checks the bench to see if champion exists"""
         for champion in self.bench:
             if isinstance(champion, Champion):
@@ -110,7 +110,7 @@ class Arena:
         """Moves champions to the board"""
         self.level: int = arena_functions.get_level()
         while self.level > self.board_size:
-            champion: Champion | None = self.have_champion()
+            champion = self.have_champion()
             if champion is not None:
                 self.move_known(champion)
             elif self.unknown_in_bench():
@@ -144,7 +144,7 @@ class Arena:
 
     def replace_unknown(self) -> None:
         """Replaces unknown champion"""
-        champion: Champion | None = self.have_champion()
+        champion = self.have_champion()
         if len(self.board_unknown) > 0 and champion is not None:
             mk_functions.press_e(screen_coords.BOARD_LOC[self.unknown_slots[len(
                 self.board_unknown) - 1]].get_coords())

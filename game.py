@@ -5,13 +5,36 @@ Handles tasks that happen each game round
 from time import sleep, perf_counter
 import random
 import multiprocessing
-import win32gui
 import settings
 import game_assets
 import game_functions
 from arena import Arena
 from vec4 import Vec4
 from vec2 import Vec2
+
+# macOS: use Quartz to find game window
+from Quartz import (
+    CGWindowListCopyWindowInfo,
+    kCGWindowListOptionOnScreenOnly,
+    kCGNullWindowID,
+)
+
+
+def find_league_window():
+    """Find the League of Legends game window on macOS using Quartz"""
+    windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)
+    for win in windows:
+        name = win.get("kCGWindowName", "") or ""
+        owner = win.get("kCGWindowOwnerName", "") or ""
+        if ("League of Legends" in name or "League of Legends" in owner) and win.get("kCGWindowBounds"):
+            bounds = win["kCGWindowBounds"]
+            x = int(bounds["X"])
+            y = int(bounds["Y"])
+            w = int(bounds["Width"])
+            h = int(bounds["Height"])
+            if w > 200 and h > 200:
+                return (x, y, w, h)
+    return None
 
 
 class Game:
@@ -23,37 +46,22 @@ class Game:
         self.round = "0-0"
         self.time: None = None
         self.forfeit_time: int = settings.FORFEIT_TIME + random.randint(50, 150)
-        self.found_window = False
 
         print("\n[!] Searching for game window")
-        while not self.found_window:
+        result = None
+        while result is None:
             print("  Did not find window, trying again...")
-            win32gui.EnumWindows(self.callback, None)
-            sleep(1)
+            result = find_league_window()
+            if result is None:
+                sleep(1)
 
-        self.loading_screen()
-
-    def callback(self, hwnd, extra) -> None:  # pylint: disable=unused-argument
-        """Function used to find the game window and get its size"""
-        if "League of Legends (TM) Client" not in win32gui.GetWindowText(hwnd):
-            return
-
-        rect = win32gui.GetWindowRect(hwnd)
-
-        x_pos = rect[0]
-        y_pos = rect[1]
-        width = rect[2] - x_pos
-        height = rect[3] - y_pos
-
-        if width < 200 or height < 200:
-            return
-
-        print(f"  Window {win32gui.GetWindowText(hwnd)} found")
-        print(f"    Location: ({x_pos}, {y_pos})")
-        print(f"    Size:     ({width}, {height})")
+        x_pos, y_pos, width, height = result
+        print(f"  Window found")
+        print(f"  Location: ({x_pos}, {y_pos})")
+        print(f"  Size: ({width}, {height})")
         Vec4.setup_screen(x_pos, y_pos, width, height)
         Vec2.setup_screen(x_pos, y_pos, width, height)
-        self.found_window = True
+        self.loading_screen()
 
     def loading_screen(self) -> None:
         """Loop that runs while the game is in the loading screen"""
@@ -68,7 +76,6 @@ class Game:
         ran_round: str = None
         while game_functions.check_alive():
             self.round: str = game_functions.get_round()
-
             if settings.FORFEIT:
                 if perf_counter() - self.start_time > self.forfeit_time:
                     game_functions.forfeit()
@@ -107,7 +114,6 @@ class Game:
         if self.round in game_assets.AUGMENT_ROUNDS:
             sleep(1)
             self.arena.pick_augment()
-            # Can't purchase champions for a short period after choosing augment
             sleep(2.5)
         if self.round == "1-3":
             sleep(1.5)
@@ -115,7 +121,6 @@ class Game:
             self.arena.tacticians_crown_check()
         elif self.round == "4-7":
             game_functions.select_shop()
-
         self.arena.fix_bench_state()
         self.arena.spend_gold()
         self.arena.move_champions()
@@ -139,7 +144,6 @@ class Game:
         if self.round in game_assets.PICKUP_ROUNDS:
             print("  Picking up items")
             game_functions.pickup_items()
-
         self.arena.fix_bench_state()
         self.arena.bench_cleanup()
         if self.round in game_assets.ANVIL_ROUNDS:
@@ -150,7 +154,6 @@ class Game:
         if self.arena.final_comp:
             self.arena.final_comp_check()
         self.arena.bench_cleanup()
-
         if self.round in game_assets.ITEM_PLACEMENT_ROUNDS:
             sleep(1)
             self.arena.place_items()

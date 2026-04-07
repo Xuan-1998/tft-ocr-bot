@@ -4,6 +4,7 @@ Handles getting into a game
 
 from time import sleep
 import json
+import os
 from requests.auth import HTTPBasicAuth
 import requests
 import urllib3
@@ -15,7 +16,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 def create_lobby(client_info: tuple) -> bool:
     """Creates a lobby"""
     payload: dict[str, int] = {"queueId": 1090}  # Ranked TFT is 1100
-    payload: dict[str, int] = json.dumps(payload)
+    payload = json.dumps(payload)
     try:
         status = requests.post(client_info[1] + "/lol-lobby/v2/lobby/", payload,
                                auth=HTTPBasicAuth('riot', client_info[0]), timeout=10, verify=False)
@@ -82,7 +83,8 @@ def change_arena_skin(client_info: tuple) -> bool:
 def get_client() -> tuple:
     """Gets data about the client such as port and auth token"""
     print("\n\n[Auto Queue]")
-    file_path = settings.LEAGUE_CLIENT_PATH + "\\lockfile"
+    # macOS lockfile location
+    file_path = os.path.join(settings.LEAGUE_CLIENT_PATH, "lockfile")
     got_lock_file = False
     while not got_lock_file:
         try:
@@ -104,9 +106,7 @@ def queue() -> None:
     client_info: tuple = get_client()
     while not create_lobby(client_info):
         sleep(3)
-
     change_arena_skin(client_info)
-
     sleep(3)
     while not check_queue(client_info):
         sleep(5)
@@ -114,7 +114,6 @@ def queue() -> None:
         sleep(3)
         start_queue(client_info)
         sleep(1)
-
     in_queue = True
     time = 0
     while in_queue:
