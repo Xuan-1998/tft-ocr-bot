@@ -1,154 +1,130 @@
 """
-TFT Set 17 Bot v4 - Mecha Fast 8
-Fixes: timing (only act in planning), god selection, loot pickup, item placement, F12 stop
+TFT Set 17 Bot v5 - Mecha Fast 8 - SIMPLIFIED
+Just works. No fancy detection. Acts every cycle.
+Cmd+= to stop.
 """
-import time, json, sys, threading
+import time, sys, os
+import warnings
+warnings.filterwarnings("ignore")  # suppress SSL warnings
+os.environ["PYTHONWARNINGS"] = "ignore"
+
 import pyautogui
-import comps, game_assets, arena_functions, mk_functions, screen_coords, ocr
+import comps, game_assets, mk_functions, screen_coords, ocr
 from vec4 import Vec4
 from vec2 import Vec2
 from game import find_league_window
 from difflib import SequenceMatcher
 from pynput import keyboard
+import requests, urllib3
+urllib3.disable_warnings()
 
-# --- Cmd+= kill switch (works globally, even when game is focused) ---
+# --- Cmd+= to stop ---
 BOT_RUNNING = True
-_pressed_keys = set()
-def on_press(key):
+_keys = set()
+def _on_press(key):
     global BOT_RUNNING
-    _pressed_keys.add(key)
-    # Cmd+= (cmd is Key.cmd or Key.cmd_r, = is KeyCode '=')
-    if (keyboard.Key.cmd in _pressed_keys or keyboard.Key.cmd_r in _pressed_keys):
+    _keys.add(key)
+    if keyboard.Key.cmd in _keys or keyboard.Key.cmd_r in _keys:
         try:
             if hasattr(key, 'char') and key.char == '=':
                 BOT_RUNNING = False
-                print("\n🛑 Cmd+= pressed — stopping bot!\n")
+                print("\n🛑 Cmd+= — STOPPED\n")
                 return False
-        except:
-            pass
-
-def on_release(key):
-    _pressed_keys.discard(key)
-
-kb_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-kb_listener.daemon = True
-kb_listener.start()
+        except: pass
+def _on_release(key):
+    _keys.discard(key)
+keyboard.Listener(on_press=_on_press, on_release=_on_release, daemon=True).start()
 
 # --- Setup ---
 w = find_league_window()
 if not w:
-    print("No game window! Start TFT first.")
+    print("No game window!")
     sys.exit(1)
 
-x, y, width, height = w
-y_off = y + round(height * 0.028)
-eff_h = height - round(height * 0.028)
-Vec4.setup_screen(x, y_off, width, eff_h)
-Vec2.setup_screen(x, y_off, width, eff_h)
+x, y, W, H = w
+Y_OFF = y + round(H * 0.028)
+EFF_H = H - round(H * 0.028)
+Vec4.setup_screen(x, Y_OFF, W, EFF_H)
+Vec2.setup_screen(x, Y_OFF, W, EFF_H)
 
-pyautogui.click(w[2]//2, w[3]//2)
+pyautogui.FAILSAFE = False
+pyautogui.click(W//2, H//2)
 time.sleep(0.3)
 
-LOG = f"/tmp/tft_v4_{int(time.time())}.jsonl"
-def log(t, **d):
-    with open(LOG, "a") as f:
-        f.write(json.dumps({"t": time.time(), "type": t, **d}) + "\n")
+print("=== TFT BOT v5 | Mecha Fast 8 | Cmd+= to stop ===\n")
 
-print("=== MECHA FAST 8 BOT v4 ===")
-print("Press Cmd+= to stop")
-print(f"Log: {LOG}\n")
+# --- API helpers ---
+def api_data():
+    try:
+        r = requests.get('https://127.0.0.1:2999/liveclientdata/allgamedata', timeout=3, verify=False)
+        return r.json()
+    except: return None
 
-# --- State ---
-phase = "ECON"
-board_size = 0
-last_round = ""
-god_rounds_handled = set()
-items_on_bench = []
+def get_gold():
+    d = api_data()
+    return int(d['activePlayer']['currentGold']) if d else 0
 
-# --- Helpers ---
-def mouse_in_game():
-    mx, my = pyautogui.position()
-    return 0 <= mx <= width + 50 and 0 <= my <= height + 80
+def get_level():
+    d = api_data()
+    return int(d['activePlayer']['level']) if d else 1
 
+def get_health():
+    try:
+        d = api_data()
+        # TFT API doesn't always have health, estimate from player list
+        return 100  # fallback
+    except: return 100
+
+# --- OCR helpers ---
 def fuzzy(raw):
     raw = raw.strip()
-    if not raw or len(raw) < 2:
-        return ""
-    if raw in game_assets.CHAMPIONS:
-        return raw
+    if not raw or len(raw) < 2: return ""
+    if raw in game_assets.CHAMPIONS: return raw
     best, best_r = "", 0
     for c in game_assets.CHAMPIONS:
         r = SequenceMatcher(a=c.lower(), b=raw.lower()).ratio()
-        if r > best_r:
-            best_r = r
-            best = c
+        if r > best_r: best_r, best = r, c
     return best if best_r >= 0.55 else ""
 
-def get_round():
-    """Read current round from screen"""
-    import game_functions
-    return game_functions.get_round()
-
-def is_planning_phase():
-    """Detect if we're in planning phase by checking if shop is visible.
-    During combat, the shop area looks different."""
-    # Simple heuristic: try to read a shop champion name
-    # If we can read text, we're in planning phase
-    try:
-        shop_img = ocr._grab(screen_coords.SHOP_POS.get_coords())
-        crop = shop_img.crop(screen_coords.CHAMP_NAME_POS[0].get_coords())
-        text = ocr.get_text_from_image(crop).strip()
-        return len(text) > 1  # If we can read a name, shop is visible = planning
-    except:
-        return False
-
 def read_shop():
-    shop_img = ocr._grab(screen_coords.SHOP_POS.get_coords())
-    shop = []
-    for idx, np in enumerate(screen_coords.CHAMP_NAME_POS):
-        crop = shop_img.crop(np.get_coords())
-        raw = ocr.get_text_from_image(crop).strip()
-        shop.append((idx, fuzzy(raw)))
-    return shop
+    try:
+        img = ocr._grab(screen_coords.SHOP_POS.get_coords())
+        shop = []
+        for idx, np in enumerate(screen_coords.CHAMP_NAME_POS):
+            crop = img.crop(np.get_coords())
+            raw = ocr.get_text_from_image(crop).strip()
+            shop.append((idx, fuzzy(raw)))
+        return shop
+    except: return []
 
-def click_buy(slot):
-    mk_functions.left_click(screen_coords.BUY_LOC[slot].get_coords())
-    time.sleep(0.2)
-
-def click_reroll():
-    mk_functions.left_click(screen_coords.REFRESH_LOC.get_coords())
-    time.sleep(0.35)
-
-def click_buy_xp():
-    mk_functions.left_click(screen_coords.BUY_XP_LOC.get_coords())
-    time.sleep(0.15)
-
-def buy_champs(targets):
-    """Buy champions from shop that match target set. Returns list of bought names."""
+# --- Actions ---
+def buy_from_shop(targets):
     shop = read_shop()
-    gold = arena_functions.get_gold()
+    gold = get_gold()
     bought = []
     for slot, name in shop:
-        if name and name in targets and gold >= game_assets.CHAMPIONS.get(name, {}).get("Gold", 99):
-            click_buy(slot)
+        if name in targets and gold >= game_assets.CHAMPIONS.get(name, {}).get("Gold", 99):
+            mk_functions.left_click(screen_coords.BUY_LOC[slot].get_coords())
+            time.sleep(0.2)
             bought.append(name)
             gold -= game_assets.CHAMPIONS[name]["Gold"]
     return bought
 
-def place_all_bench():
-    """Move bench units to board"""
-    global board_size
-    level = arena_functions.get_level()
-    for i in range(9):
-        if board_size >= level:
-            break
+def reroll():
+    mk_functions.left_click(screen_coords.REFRESH_LOC.get_coords())
+    time.sleep(0.3)
+
+def buy_xp():
+    mk_functions.left_click(screen_coords.BUY_XP_LOC.get_coords())
+    time.sleep(0.15)
+
+def place_bench():
+    level = get_level()
+    for i in range(min(9, level)):
         mk_functions.left_click(screen_coords.BENCH_LOC[i].get_coords())
-        time.sleep(0.1)
-        pos = 21 + (board_size % 7)
-        mk_functions.left_click(screen_coords.BOARD_LOC[pos].get_coords())
-        time.sleep(0.1)
-        board_size += 1
-    board_size = min(board_size, level)
+        time.sleep(0.08)
+        mk_functions.left_click(screen_coords.BOARD_LOC[21 + (i % 7)].get_coords())
+        time.sleep(0.08)
 
 def sell_bench():
     for i in range(9):
@@ -156,207 +132,139 @@ def sell_bench():
         time.sleep(0.05)
 
 def pickup_loot():
-    """Pick up items/loot from board"""
-    print("  📦 Picking up loot")
-    for idx, coords in enumerate(screen_coords.ITEM_PICKUP_LOC):
-        mk_functions.right_click(coords.get_coords())
-        time.sleep(0.6 if idx % 2 else 1.0)
+    # Dense sweep of entire board to grab all orbs/loot/god rewards
+    print("  📦 Sweeping board for loot...")
+    for py in range(200, 750, 35):
+        for px in range(250, 1500, 50):
+            mk_functions.right_click((px, py))
+            time.sleep(0.04)
+    pyautogui.click(W//2, Y_OFF + EFF_H//2)
+    time.sleep(0.3)
 
-def handle_god_selection():
-    """At god rounds, the screen shows two god blessings side by side.
-    Detect by checking if center screen is dark (overlay). Click left option."""
-    # Check if god screen is showing — center of screen will be dark overlay
-    center_img = ocr._grab((width//2 - 50, y_off + eff_h//3, width//2 + 50, y_off + eff_h//3 + 30))
-    import numpy as np
-    arr = np.array(center_img)
-    avg_brightness = arr.mean()
-    if avg_brightness > 100:
-        return False  # Not a dark overlay, no god screen
-
-    print("  ⚡ God selection screen detected — picking left blessing")
-    # Left blessing: ~30% from left, ~45% from top
-    left_x = int(width * 0.30)
-    left_y = int(y_off + eff_h * 0.45)
-    pyautogui.click(left_x, left_y)
-    time.sleep(1.5)
-    # Click again in case there's a confirm
-    pyautogui.click(left_x, left_y)
-    time.sleep(1)
-    # Collect Pengu rewards — click center
-    print("  🎁 Collecting rewards")
-    pyautogui.click(width // 2, int(y_off + eff_h * 0.5))
-    time.sleep(1)
-    pyautogui.click(width // 2, int(y_off + eff_h * 0.5))
-    time.sleep(0.5)
-    return True
-
-def place_items_on_carries():
-    """Try to place items from item bench onto carry champions.
-    Items sit on the left side, carries are on the board."""
+def place_items():
+    """Drag all items from item bench onto carry champions.
+    Items sit on left side of board. Drag each to a carry."""
     print("  🔧 Placing items on carries")
-    # Item positions are on the left side of the board
-    # Try dragging each item slot to the carry positions
-    carry_positions = []
-    for name, data in comps.COMP.items():
-        if data.get("priority", 99) <= 2 and data.get("items"):
-            carry_positions.append(data["board_position"])
+    # Carry board positions: ASol=14 (main AP), TahmKench=24 (tank), Karma=0 (secondary AP)
+    carry_slots = [14, 24, 0, 25, 26]
+    carry_boards = [screen_coords.BOARD_LOC[s].get_coords() for s in carry_slots]
 
-    if not carry_positions:
-        return
+    item_idx = 0
+    for i in range(min(10, len(screen_coords.ITEM_POS))):
+        # Hover item to check if it exists
+        item_coords = screen_coords.ITEM_POS[i][0].get_coords()
+        target = carry_boards[item_idx % len(carry_boards)]
 
-    for i, item_pos in enumerate(screen_coords.ITEM_POS[:6]):
-        if not carry_positions:
-            break
-        # Pick up item
-        item_coords = item_pos[0].get_coords()
-        # Place on first carry
-        target = carry_positions[i % len(carry_positions)]
-        board_coords = screen_coords.BOARD_LOC[target].get_coords()
-
+        # Click item, then click carry to equip
         mk_functions.left_click(item_coords)
         time.sleep(0.15)
-        mk_functions.left_click(board_coords)
+        mk_functions.left_click(target)
         time.sleep(0.15)
+        item_idx += 1
 
-def pick_augment():
-    """Pick first augment"""
-    print("  🎯 Picking augment")
-    time.sleep(1.5)
-    mk_functions.left_click(screen_coords.AUGMENT_LOC[0].get_coords())
-    time.sleep(1)
+def click_center():
+    """Click center of game — used for god selection, augments, loot collection"""
+    pyautogui.click(W//2, Y_OFF + EFF_H//2)
+    time.sleep(0.5)
 
-# --- God round set ---
-GOD_ROUNDS = {"2-4", "3-4", "4-4"}
-AUGMENT_ROUNDS = {"2-1", "3-2", "4-2"}
-LOOT_ROUNDS = {"2-1", "3-1", "4-1", "5-1", "6-1", "7-1"}
-ITEM_ROUNDS = {"2-2", "3-2", "4-2", "5-2", "6-2", "2-5", "3-5", "4-5", "5-5"}
+def click_left_option():
+    """Click left side option (god blessing, augment)"""
+    pyautogui.click(int(W * 0.30), Y_OFF + int(EFF_H * 0.45))
+    time.sleep(0.5)
 
 # ============ MAIN LOOP ============
+phase = "ECON"
+cycle = 0
+last_action_time = 0
+
 try:
-    cycle = 0
     while BOT_RUNNING:
-        # Mouse safety
-        if not mouse_in_game():
-            print("  ⏸ Mouse outside game — paused")
-            while not mouse_in_game() and BOT_RUNNING:
-                time.sleep(0.5)
-            if not BOT_RUNNING:
-                break
-            pyautogui.click(w[2]//2, w[3]//2)
+        gold = get_gold()
+        level = get_level()
+
+        if cycle % 5 == 0:
+            print(f"[{phase}] C{cycle} Gold:{gold} Lvl:{level}")
+
+        # --- Every 10 cycles: try clicking center to dismiss popups/collect loot ---
+        if cycle % 10 == 0:
+            click_center()
             time.sleep(0.3)
-            print("  ▶ Resumed")
 
-        gold = arena_functions.get_gold()
-        level = arena_functions.get_level()
-        health = arena_functions.get_health()
-        current_round = get_round()
+        # --- Every 15 cycles: try clicking left option for god/augment ---
+        if cycle % 15 == 0:
+            click_left_option()
+            time.sleep(0.5)
+            click_center()  # collect rewards after
+            time.sleep(0.3)
 
-        # Track round changes
-        round_changed = current_round != last_round and current_round in game_assets.ROUNDS
-        if round_changed:
-            last_round = current_round
-            print(f"\n{'='*50}")
-            print(f"[{phase}] Round {current_round} | Gold:{gold} Lvl:{level} HP:{health}")
-            print(f"{'='*50}")
-            log("round", round=current_round, gold=gold, level=level, health=health, phase=phase)
-
-        if health <= 0:
-            print("\n💀 GAME OVER")
-            break
-
-        # --- WAIT FOR PLANNING PHASE ---
-        if not is_planning_phase():
-            # We're in combat — do nothing, just wait
-            time.sleep(1)
-            cycle += 1
-            continue
-
-        # --- Handle special screens (god selection, augments) ---
-        # Try god selection every cycle (detect by screen overlay)
-        if handle_god_selection():
-            time.sleep(2)
-            continue
-
-        if round_changed and current_round in AUGMENT_ROUNDS:
-            pick_augment()
-            time.sleep(2)
-
-        if round_changed and current_round in LOOT_ROUNDS:
+        # --- Every 8 cycles: pickup loot ---
+        if cycle % 8 == 0 and cycle > 0:
             pickup_loot()
 
-        if round_changed and current_round in ITEM_ROUNDS:
-            place_items_on_carries()
+        # --- Every 10 cycles: place items on carries ---
+        if cycle % 10 == 0 and cycle > 0:
+            place_items()
 
-        # --- PHASE TRANSITIONS ---
-        # Switch to rolldown at 4-1 or when we have 50+ gold and level >= 5 and enough cycles
-        if phase == "ECON" and ((current_round in game_assets.ROUNDS and current_round >= "4-1") or
-                                (gold >= 50 and level >= 5 and cycle > 25) or health < 35):
-            phase = "ROLLDOWN"
-            print("\n>>> 🚀 ROLLDOWN PHASE <<<\n")
-
-        if phase == "ROLLDOWN_DONE":
-            phase = "LATEGAME"
-
-        # ========== ECON PHASE ==========
+        # === ECON PHASE: save gold, buy cheap frontline ===
         if phase == "ECON":
-            # Only buy cheap frontline from natural shop (NO rerolling)
-            bought = buy_champs(comps.EARLY_GAME_BUYS)
+            bought = buy_from_shop(comps.EARLY_GAME_BUYS)
             if bought:
-                print(f"    Bought: {bought}")
-                place_all_bench()
+                print(f"  Bought: {bought}")
+                place_bench()
 
-            # Buy XP only if above 50 gold
+            # Buy XP only above 50 gold
             if gold > 54 and level < 5:
-                click_buy_xp()
+                buy_xp()
 
-        # ========== ROLLDOWN PHASE ==========
+            # Transition: enough gold + high enough level, or low HP
+            if (gold >= 50 and level >= 5 and cycle > 30):
+                phase = "ROLLDOWN"
+                print("\n🚀 ROLLDOWN — leveling to 8 and rolling!\n")
+
+        # === ROLLDOWN PHASE: level 8, roll for carries ===
         elif phase == "ROLLDOWN":
             # Level to 8
-            while arena_functions.get_level() < 8 and arena_functions.get_gold() > 4:
-                click_buy_xp()
-            level = arena_functions.get_level()
-            print(f"  Leveled to {level}")
+            while get_level() < 8 and get_gold() > 4:
+                buy_xp()
+            print(f"  Level: {get_level()}")
 
             sell_bench()
             time.sleep(0.3)
 
             # Roll for core
-            rolls = 0
             found = []
             all_targets = comps.ROLLDOWN_BUYS | comps.EARLY_GAME_BUYS
-            while arena_functions.get_gold() > 10 and rolls < 30 and BOT_RUNNING:
-                click_reroll()
-                bought = buy_champs(all_targets)
-                if bought:
-                    found.extend(bought)
-                    print(f"    Found: {bought}")
+            rolls = 0
+            while get_gold() > 10 and rolls < 25 and BOT_RUNNING:
+                reroll()
+                b = buy_from_shop(all_targets)
+                if b:
+                    found.extend(b)
+                    print(f"  Found: {b}")
                 rolls += 1
 
-            place_all_bench()
-            place_items_on_carries()
-            print(f"  Rolled {rolls}x, found: {found}")
-            log("rolldown", rolls=rolls, found=found)
+            place_bench()
+            place_items()
+            print(f"  Rolled {rolls}x, total found: {found}")
             phase = "LATEGAME"
-            print("\n>>> 🏆 LATEGAME PHASE <<<\n")
+            print("\n🏆 LATEGAME\n")
 
-        # ========== LATEGAME PHASE ==========
+        # === LATEGAME: upgrade + level 9 ===
         elif phase == "LATEGAME":
             if gold > 30:
-                click_reroll()
-                all_targets = comps.ROLLDOWN_BUYS | comps.EARLY_GAME_BUYS
-                bought = buy_champs(all_targets)
-                if bought:
-                    print(f"    Upgrade: {bought}")
-                    place_all_bench()
-
+                reroll()
+                b = buy_from_shop(comps.ROLLDOWN_BUYS | comps.EARLY_GAME_BUYS)
+                if b:
+                    print(f"  Upgrade: {b}")
+                    place_bench()
             if gold > 60 and level < 9:
-                click_buy_xp()
+                buy_xp()
 
         mk_functions.move_mouse(screen_coords.DEFAULT_LOC.get_coords())
         cycle += 1
         time.sleep(2)
 
 except KeyboardInterrupt:
-    print("\nBot stopped.")
+    pass
 
-print(f"Log: {LOG}")
+print("Bot done.")
