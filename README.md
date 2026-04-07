@@ -1,38 +1,78 @@
-![main](https://i.imgur.com/roX0N3C.png)
+# Intelligent TFT Agent
 
-## NOTES:
-- Make sure you don't have any overlays on (Blitz, Mobalytics, etc.).
-- League & client must be in English.
-- 16:9 resolution borderless windowed is required in League, the game must also be on the main monitor (Use 1920x1080 for best results).
-- If the program crashes, create an issue with the error.
+An AI-powered Teamfight Tactics bot that learns and evolves through gameplay.
 
-## INSTALLATION:
-1. Install Python 3.10.6 from https://www.python.org/downloads/windows/
-   - Note that Python 3.10.6 cannot be used on Windows 7 or earlier.
-2. Clone the repository or download it from here https://github.com/jfd02/TFT-OCR-BOT/archive/refs/heads/main.zip
-3. Open Command Prompt and change the current directory to the folder where main.py is located 
-4. Run pip install -r requirements.txt in Command Prompt
-5. Install tesseract using the Windows installer available at: https://github.com/UB-Mannheim/tesseract/wiki
-   - Note the tesseract path from the installation.
-   - Set the tesseract path in the settings.py file (it may already be correct)
-6. Configure settings.py so the league client path is correct
-7. Disable all in-game overlays
-8. Run the main.py file
+Built on top of [jfd02/TFT-OCR-BOT](https://github.com/jfd02/TFT-OCR-BOT) with macOS support.
 
-## FEATURES:
-![main](https://i.imgur.com/1bXOmag.png)
-- Read the board state (Round / Level / Gold / Shop / Items)
-- Keeps track of champions on the board and bench
-- Pick a random item/champ from the carousel
-- Pickup items from the board after PVE rounds
-- Place correct items onto champions
-- Plays the user-defined team comp
-- Auto queue using the LCU API
+## Architecture
 
-## TODO:
-- Implement tome of traits logic
-- Revamp the gold spending function
-- Revamp auto queue to have more safety checks / fail-safes
-- Grab the best compositions from TFT website
-- Intelligent carousel item selection
-- Change item pickup to be based on the coordinates of orbs
+```
+┌─────────────────────────────────────────┐
+│              Game Interface              │
+│  Screen Capture (mss) + Riot API        │
+│  Mouse/Keyboard (pyautogui)             │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│            Game State Engine             │
+│  - Round, Gold, Level, HP (API)         │
+│  - Shop champions (OCR)                 │
+│  - Board state, Items                   │
+│  - Phase detection (planning/combat)    │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│          Decision Engine                 │
+│  Phase 1: Rule-based (current)          │
+│  Phase 2: LLM-assisted (Gemma vision)   │
+│  Phase 3: RL fine-tuned                 │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│          Memory & Evolution              │
+│  - Game logs (JSONL)                    │
+│  - Win/loss tracking                    │
+│  - Decision replay buffer               │
+│  - Self-improvement loop                │
+└─────────────────────────────────────────┘
+```
+
+## Current Status (Set 17: Space Gods)
+
+- ✅ macOS support (Quartz window detection, mss screen capture, pyautogui input)
+- ✅ Riot Live Client API for gold/level/HP
+- ✅ OCR shop reading with fuzzy champion matching
+- ✅ Champion buying and board placement
+- ✅ Econ strategy (save → rolldown at level 8)
+- ✅ Cmd+= global hotkey to stop
+- 🔧 Item building and placement (WIP)
+- 🔧 God selection (Set 17 mechanic)
+- 🔧 Loot pickup
+- 🔧 LLM integration for decision making
+- 🔧 Game memory and evolution
+
+## Strategy: Mecha Fast 8
+
+1. **Rounds 1-1 to 3-7**: Econ. Buy cheap frontline only. Save to 50+ gold.
+2. **Round 4-1**: Level to 8, roll down for AurelionSol, TahmKench, Karma, Urgot, TheMightyMech.
+3. **Late game**: Upgrade units, level to 9.
+
+## Usage
+
+```bash
+cd ~/tft-ocr-bot-macos
+source venv/bin/activate
+python3 play_now.py    # Cmd+= to stop
+```
+
+## Requirements
+
+- macOS with TFT installed (PBE or Live)
+- Python 3.9+
+- Tesseract OCR (`brew install tesseract`)
+- Screen Recording + Accessibility permissions granted
+
+## Credits
+
+- Original OCR bot: [jfd02/TFT-OCR-BOT](https://github.com/jfd02/TFT-OCR-BOT)
+- macOS port + Set 17 + AI agent: [Xuan-1998](https://github.com/Xuan-1998)
