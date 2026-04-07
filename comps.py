@@ -1,199 +1,125 @@
 """
-Team composition used by the bot
-Comps come from https://tftactics.gg/tierlist/team-comps
-Items are in camel case and a-Z
+TFT Set 17 Bot - Mecha Comp (Fast 8)
+Strategy:
+  1-1 to 3-7: ECON. Buy only cheap frontline to survive. Save to 50+ gold.
+  4-1: Level to 8, roll down for Mecha core (AurelionSol, TahmKench, Karma, Urgot)
+  4-1+: Fill board with best available units, place items on carries.
 """
 
 COMP = {
-    "Nasus": {
+    # Core Mecha carries - BUY THESE AT 4-1
+    "AurelionSol": {
+        "board_position": 14,  # back row center - main carry
+        "items": ["JeweledGauntlet", "RabadonsDeathcap", "SpearofShojin"],
+        "level": 2,
+        "final_comp": True,
+        "priority": 1,
+    },
+    "TahmKench": {
+        "board_position": 24,  # front row - tank
+        "items": ["WarmogsArmor", "DragonsClaw", "BrambleVest"],
+        "level": 2,
+        "final_comp": True,
+        "priority": 1,
+    },
+    "Karma": {
+        "board_position": 0,  # back corner - AP carry
+        "items": ["BlueBuff", "JeweledGauntlet", "GiantSlayer"],
+        "level": 2,
+        "final_comp": True,
+        "priority": 1,
+    },
+    "Urgot": {
+        "board_position": 25,  # front row
+        "items": ["SunfireCape", "Redemption", "GargoyleStoneplate"],
+        "level": 2,
+        "final_comp": True,
+        "priority": 2,
+    },
+    "TheMightyMech": {
+        "board_position": 26,  # front row
+        "items": [],
+        "level": 2,
+        "final_comp": True,
+        "priority": 2,
+    },
+    # Early game holders / frontline to survive until 4-1
+    "Poppy": {
+        "board_position": 23,
+        "items": [],
+        "level": 2,
+        "final_comp": False,
+        "priority": 3,
+    },
+    "Leona": {
         "board_position": 22,
-        "items": ["Bloodthirster", "RapidFirecannon", "TitansResolve"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "Sylas": {
-        "board_position": 3,
-        "items": ["Redemption", "SunfireCape", "WarmogsArmor"],
-        "level": 3,
-        "final_comp": True
-    },
-    "Jinx": {
-        "board_position": 0,
-        "items": ["GuinsoosRageblade", "InfinityEdge", "GiantSlayer"],
-        "level": 3,
-        "final_comp": True
-    },
-    "Riven": {
-        "board_position": 24,
-        "items": ["Redemption", "SunfireCape", "WarmogsArmor"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "Vayne": {
-        "board_position": 5,
-        "items": ["GiantSlayer", "GuinsoosRageblade", "InfinityEdge"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "MissFortune": {
-        "board_position": 6,
-        "items": ["GiantSlayer", "JeweledGauntlet", "SpearofShojin"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "Ekko": {
-        "board_position": 26,
-        "items": ["Redemption", "SunfireCape", "WarmogsArmor"],
-        "level": 3,
-        "final_comp": True
-    },
-    "Sejuani": {
-        "board_position": 25,
-        "items": ["Redemption", "SunfireCape", "WarmogsArmor"],
-        "level": 3,
-        "final_comp": True,
-    },
-}
-
-OLD_COMP = {
-    "Ashe": {
-        "board_position": 0,
-        "items": ["GuinsoosRageblade", "LastWhisper", "GiantSlayer"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "Ezreal": {
-        "board_position": 6,
-        "items": ["BlueBuff", "GiantSlayer", "JeweledGauntlet"],
-        "level": 3,
-        "final_comp": True
-    },
-    "Gangplank": {
-        "board_position": 15,
-        "items": ["Bloodthirster", "JeweledGauntlet", "TitansResolve"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "Malphite": {
-        "board_position": 22,
-        "items": ["ZzRotPortal", "Redemption", "WarmogsArmor"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "Renekton": {
-        "board_position": 24,
-        "items": ["WarmogsArmor", "DragonsClaw", "Redemption"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "LeeSin": {
-        "board_position": 25,
-        "items": ["Redemption", "SunfireCape", "WarmogsArmor"],
-        "level": 3,
-        "final_comp": True
-    },
-    "Yasuo": {
-        "board_position": 26,
-        "items": ["Bloodthirster", "TitansResolve", "HandofJustice"],
-        "level": 3,
-        "final_comp": True,
-    },
-    "Zed": {
-        "board_position": 18,
-        "items": ["EdgeofNight", "RunaansHurricane", "LastWhisper"],
-        "level": 3,
-        "final_comp": True,
+        "items": [],
+        "level": 2,
+        "final_comp": False,
+        "priority": 3,
     },
     "Mordekaiser": {
-        "board_position": 19,
-        "items": ["RabadonsDeathcap", "HextechGunblade", "Morellonomicon"],
-        "level": 3,
-        "final_comp": True,
-    }
+        "board_position": 27,
+        "items": [],
+        "level": 2,
+        "final_comp": False,
+        "priority": 3,
+    },
+    "Nasus": {
+        "board_position": 21,
+        "items": [],
+        "level": 2,
+        "final_comp": False,
+        "priority": 3,
+    },
+    "ChoGath": {
+        "board_position": 3,
+        "items": [],
+        "level": 2,
+        "final_comp": False,
+        "priority": 3,
+    },
+    "Caitlyn": {
+        "board_position": 6,
+        "items": [],
+        "level": 2,
+        "final_comp": False,
+        "priority": 3,
+    },
 }
-"""
-Team composition used by the bot
-Comps come from https://tftactics.gg/tierlist/team-comps
-Items are in camel case and a-Z
-"""
 
-
-# No logic for certain augments meaning the bot won't know what to do if they are included in here
-# (Anything that changes gameplay or adds something to the bench).
-AUGMENTS: list[str] = [
-    "Featherweight",
-    "Combat Training",
-    "Tiny Legends",
-    "Celestial Blessing",
-    "Knife's Edge",
-    "First Aid",
-    "Shadow Jutsu",
-    "Contempt for the Weak",
-    "Laser Focus",
-    "Corps Focus",
-    "Siphoning Winds",
-    "Spirit of the Exile",
-    "Rising Spell Force",
-    "Raider's Spoils",
-    "Flaming Ricochet",
-    "Get Paid",
-    "Flurry",
-    "Invigorate",
-    "Reign of Anger",
-    "Cull the Meek",
-    "Rock Solid",
-    "Guardian Spirit",
-    "Cybernetic Implants",
-    "Stand United",
-    "Electrocharge",
-    "Cybernetic Uplink",
-    "Celestial Blessing",
-    "Cybernetic Shell",
-    "Weakspot",
-    "Tri Force",
-    "Gadget Expert",
-    "Metabolic Accelerator",
-    "Second Wind",
-    "Luden's Echo",
-    "Last Stand",
-    "Ascension",
-    "Tiny Titans",
-    "Sunfire Board",
-    "Wise Spending",
-    "Component Grab Bag+",
-    "Featherweights",
-    "Thrill of the Hunt",
-    "Preparation",
-    "Blue Battery",
-    "Hustler",
-    "Windfall++",
-    "Verdant Veil",
-    "First Aid Kit",
-    "Rich Get Richer+",
-    "Combat Training",
-    "Meditation",
-    "Axiom Arc",
+# Augments to look for (generic good ones)
+AUGMENTS: list = [
+    "Featherweight", "Combat Training", "Celestial Blessing",
+    "Cybernetic Implants", "Stand United", "Electrocharge",
+    "Cybernetic Uplink", "Cybernetic Shell", "Weakspot",
+    "Tri Force", "Metabolic Accelerator", "Second Wind",
+    "Last Stand", "Ascension", "Sunfire Board",
+    "Wise Spending", "Preparation", "Blue Battery",
+    "Hustler", "Verdant Veil", "First Aid Kit",
+    "Rich Get Richer", "Meditation", "Component Grab Bag",
 ]
 
 
 def champions_to_buy() -> list:
-    """Creates a list of champions to buy during the game"""
-    champs_to_buy: list = []
-    for champion, champion_data in COMP.items():
-        if champion_data["level"] == 1:
-            champs_to_buy.append(champion)
-        elif champion_data["level"] == 2:
-            champs_to_buy.extend([champion] * 3)
-        elif champion_data["level"] == 3:
-            champs_to_buy.extend([champion] * 9)
-        else:
-            raise Exception("Comps.py | Champion level must be a valid level (1-3)")
-    return champs_to_buy
+    champs = []
+    for name, data in COMP.items():
+        if data["level"] == 1:
+            champs.append(name)
+        elif data["level"] == 2:
+            champs.extend([name] * 3)
+        elif data["level"] == 3:
+            champs.extend([name] * 9)
+    return champs
 
 
 def get_unknown_slots() -> list:
-    """Creates a list of slots on the board that don't have a champion from the team composition"""
-    container: list = []
-    for _, champion_data in COMP.items():
-        container.append(champion_data["board_position"])
-    return [n for n in range(27) if n not in container]
+    used = [d["board_position"] for d in COMP.values()]
+    return [n for n in range(27) if n not in used]
+
+
+# Which champs to buy in early game (1-cost/2-cost frontline to survive)
+EARLY_GAME_BUYS = {"Poppy", "Leona", "Mordekaiser", "Nasus", "ChoGath", "Caitlyn"}
+
+# Which champs to buy at level 8 rolldown
+ROLLDOWN_BUYS = {"AurelionSol", "TahmKench", "Karma", "Urgot", "TheMightyMech"}

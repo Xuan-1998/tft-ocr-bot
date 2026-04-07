@@ -34,12 +34,17 @@ def get_health() -> int:
 
 
 def get_gold() -> int:
-    """Returns the gold for the tactician"""
-    gold: str = ocr.get_text(screenxy=screen_coords.GOLD_POS.get_coords(), scale=3, psm=7, whitelist="0123456789")
+    """Returns the gold for the tactician via API, falls back to OCR"""
     try:
-        return int(gold)
-    except ValueError:
-        return 0
+        response = requests.get(
+            'https://127.0.0.1:2999/liveclientdata/allgamedata', timeout=10, verify=False)
+        return int(response.json()['activePlayer']['currentGold'])
+    except (requests.exceptions.ConnectionError, KeyError, ValueError):
+        gold: str = ocr.get_text(screenxy=screen_coords.GOLD_POS.get_coords(), scale=3, psm=7, whitelist="0123456789")
+        try:
+            return int(gold)
+        except ValueError:
+            return 0
 
 
 def valid_champ(champ: str) -> str:

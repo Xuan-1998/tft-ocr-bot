@@ -25,8 +25,7 @@ def find_league_window():
     windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)
     for win in windows:
         name = win.get("kCGWindowName", "") or ""
-        owner = win.get("kCGWindowOwnerName", "") or ""
-        if ("League of Legends" in name or "League of Legends" in owner) and win.get("kCGWindowBounds"):
+        if "League of Legends (TM) Client" in name and win.get("kCGWindowBounds"):
             bounds = win["kCGWindowBounds"]
             x = int(bounds["X"])
             y = int(bounds["Y"])
@@ -59,8 +58,17 @@ class Game:
         print(f"  Window found")
         print(f"  Location: ({x_pos}, {y_pos})")
         print(f"  Size: ({width}, {height})")
-        Vec4.setup_screen(x_pos, y_pos, width, height)
-        Vec2.setup_screen(x_pos, y_pos, width, height)
+
+        # macOS: the game renders with a title bar / top padding.
+        # Calibrate by computing the effective Y offset from the known
+        # round-indicator position (original 1080p coord y=10).
+        # Empirically the game content starts ~28px below the window top
+        # on non-1080p macOS displays.  Adjust offset so the 1920x1080
+        # coordinate system maps correctly.
+        y_offset = y_pos + round(height * 0.028)   # ~28px at 1000h
+        eff_height = height - round(height * 0.028)
+        Vec4.setup_screen(x_pos, y_offset, width, eff_height)
+        Vec2.setup_screen(x_pos, y_offset, width, eff_height)
         self.loading_screen()
 
     def loading_screen(self) -> None:
