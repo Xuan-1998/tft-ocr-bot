@@ -127,9 +127,21 @@ def place_bench():
         time.sleep(0.08)
 
 def sell_bench():
+    # Sell all bench units (clean slate)
     for i in range(9):
         mk_functions.press_e(screen_coords.BENCH_LOC[i].get_coords())
         time.sleep(0.05)
+
+def drag_item(src, dst):
+    """Drag from src coords to dst coords"""
+    pyautogui.moveTo(src[0], src[1])
+    time.sleep(0.08)
+    pyautogui.mouseDown()
+    time.sleep(0.05)
+    pyautogui.moveTo(dst[0], dst[1], duration=0.15)
+    time.sleep(0.05)
+    pyautogui.mouseUp()
+    time.sleep(0.1)
 
 def pickup_loot():
     # Dense sweep of entire board to grab all orbs/loot/god rewards
@@ -142,25 +154,15 @@ def pickup_loot():
     time.sleep(0.3)
 
 def place_items():
-    """Drag all items from item bench onto carry champions.
-    Items sit on left side of board. Drag each to a carry."""
-    print("  🔧 Placing items on carries")
-    # Carry board positions: ASol=14 (main AP), TahmKench=24 (tank), Karma=0 (secondary AP)
+    """Drag items from item bench onto carry champions."""
+    print("  🔧 Dragging items onto carries")
     carry_slots = [14, 24, 0, 25, 26]
-    carry_boards = [screen_coords.BOARD_LOC[s].get_coords() for s in carry_slots]
+    carry_coords = [screen_coords.BOARD_LOC[s].get_coords() for s in carry_slots]
 
-    item_idx = 0
     for i in range(min(10, len(screen_coords.ITEM_POS))):
-        # Hover item to check if it exists
-        item_coords = screen_coords.ITEM_POS[i][0].get_coords()
-        target = carry_boards[item_idx % len(carry_boards)]
-
-        # Click item, then click carry to equip
-        mk_functions.left_click(item_coords)
-        time.sleep(0.15)
-        mk_functions.left_click(target)
-        time.sleep(0.15)
-        item_idx += 1
+        src = screen_coords.ITEM_POS[i][0].get_coords()
+        dst = carry_coords[i % len(carry_coords)]
+        drag_item(src, dst)
 
 def click_center():
     """Click center of game — used for god selection, augments, loot collection"""
